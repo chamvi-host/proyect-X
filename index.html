@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
-    <h1>Sube un PDF con preguntas</h1>
+    <h1>Sube un PDF con pregccuntas</h1>
     <input type="file" id="pdfInput" accept="application/pdf">
     
     <div id="loading-container">
@@ -43,105 +43,82 @@
         document.getElementById('pdfInput').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (file) {
-                console.log("Archivo seleccionado: " + file.name);
                 document.getElementById('loading-container').style.display = 'block';
                 document.getElementById('progress').style.width = '0%';
                 const reader = new FileReader();
                 reader.onload = async function() {
-                    console.log("Leyendo archivo PDF...");
                     const typedArray = new Uint8Array(reader.result);
                     const pdf = await pdfjsLib.getDocument(typedArray).promise;
-                    console.log("PDF cargado con " + pdf.numPages + " páginas.");
-                    let extractedText = "";
-                    let images = [];
-
-                    // Procesamos cada página para extraer texto e imágenes
+                    let extractedQuestions = [];
                     for (let i = 1; i <= pdf.numPages; i++) {
-                        console.log("Procesando página " + i + "...");
                         document.getElementById('progress').style.width = `${(i / pdf.numPages) * 100}%`;
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         const pageText = textContent.items.map(item => item.str).join(" ");
-                        extractedText += pageText + "\n";
-
-                        // Extraer imágenes
-                        const imagesOnPage = await extractImagesFromPage(page);
-                        images = images.concat(imagesOnPage);
+                        const images = await extractImagesFromPage(page);
+                        extractedQuestions.push({ text: pageText, images });
                     }
-
-                    console.log("Extracción de texto completada.");
-                    extractQuestions(extractedText, images);
+                    extractQuestions(extractedQuestions);
                     document.getElementById('loading-container').style.display = 'none';
                 };
                 reader.readAsArrayBuffer(file);
             }
         });
 
-        // Función para extraer imágenes de la página usando los recursos de XObject
         async function extractImagesFromPage(page) {
-            const images = [];
-            const pageResources = await page.getOperatorList();
-            const xobjects = pageResources.items.filter(item => item.fn === pdfjsLib.OPS.paintImageXObject);
-
-            // Extraer las imágenes de los XObjects
-            for (let xobject of xobjects) {
-                const imageData = await page.objs.get(xobject.args[0]);
-                const img = await convertImageDataToBase64(imageData);
-                images.push(img);
+            const operatorList = await page.getOperatorList();
+            const imagePromises = [];
+            
+            for (let i = 0; i < operatorList.fnArray.length; i++) {
+                if (operatorList.fnArray[i] === pdfjsLib.OPS.paintImageXObject) {
+                    const imageName = operatorList.argsArray[i][0];
+                    imagePromises.push(page.objs.get(imageName).then(imageData => convertImageDataToBase64(imageData)));
+                }
             }
-
-            return images;
+            return Promise.all(imagePromises);
         }
 
-        // Función para convertir datos de imagen a base64
-        async function convertImageDataToBase64(imageData) {
+        function convertImageDataToBase64(imageData) {
+            if (!imageData || !imageData.data) return null;
             const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const img = new Image();
-            img.src = imageData;
-            await new Promise(resolve => {
-                img.onload = () => {
-                    context.drawImage(img, 0, 0);
-                    resolve();
+            canvas.width = imageData.width;
+            canvas.height = imageData.height;
+            const ctx = canvas.getContext('2d');
+            const imageDataObject = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+            ctx.putImageData(imageDataObject, 0, 0);
+            return canvas.toDataURL();
+        }
+
+        function extractQuestions(data) {
+            questions = data.map(({ text, images }) => {
+                const questionMatch = text.match(/([^.?]*\?)/g);
+                return {
+                    text: questionMatch ? questionMatch[0].trim() : "Pregunta sin texto",
+                    images,
+                    answer: Math.random() > 0.5
                 };
             });
-            return canvas.toDataURL('image/png');
-        }
-
-        function extractQuestions(text, images) {
-            console.log("Extrayendo preguntas del texto...");
-            const questionRegex = /([^.?!]*\?)/g;
-            const matches = text.match(questionRegex) || [];
-            console.log(matches);  // Verifica las preguntas extraídas
-            questions = matches.map((q, index) => ({
-                text: q.trim(),
-                image: images[index] || null,  // Asociamos una imagen si existe
-                answer: Math.random() > 0.5
-            }));
-            console.log("Se encontraron " + questions.length + " preguntas.");
             currentIndex = 0;
             displayQuestion();
         }
 
         function displayQuestion() {
             if (questions.length === 0) return;
-            console.log("Mostrando pregunta " + (currentIndex + 1) + " de " + questions.length);
             document.getElementById('question-container').style.display = 'block';
             document.getElementById('question-text').textContent = questions[currentIndex].text;
-            const imgElement = document.getElementById('question-image');
-            if (questions[currentIndex].image) {
-                imgElement.src = questions[currentIndex].image;  // Asignar la imagen a mostrar
-                imgElement.style.display = 'block';
-            } else {
-                imgElement.style.display = 'none';
-            }
             document.getElementById('feedback').textContent = '';
+            const imageElement = document.getElementById('question-image');
+            if (questions[currentIndex].images.length > 0) {
+                imageElement.src = questions[currentIndex].images[0];
+                imageElement.style.display = 'block';
+            } else {
+                imageElement.style.display = 'none';
+            }
         }
 
         function checkAnswer(answer) {
             const correct = answer === questions[currentIndex].answer;
             document.getElementById('feedback').textContent = correct ? "Correcto" : "Incorrecto";
-            console.log("Respuesta seleccionada: " + (answer ? "Verdadero" : "Falso") + ". Resultado: " + (correct ? "Correcto" : "Incorrecto"));
         }
 
         function nextQuestion() {
