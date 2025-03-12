@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz PDF - Verdadero o Falso</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #question-container { margin-top: 20px; display: none; }
+        img { max-width: 100%; height: auto; margin-top: 10px; }
+        button { margin: 5px; padding: 10px; cursor: pointer; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+    <h1>Sube un PDF con preguntas</h1>
+    <input type="file" id="pdfInput" accept="application/pdf">
+    
+    <div id="question-container">
+        <p id="question-text"></p>
+        <img id="question-image" style="display:none;" alt="Imagen de la pregunta">
+        <br>
+        <button onclick="checkAnswer(true)">Verdadero</button>
+        <button onclick="checkAnswer(false)">Falso</button>
+        <p id="feedback"></p>
+        <br>
+        <button onclick="prevQuestion()">Anterior</button>
+        <button onclick="nextQuestion()">Siguiente</button>
+    </div>
+    
+    <script>
+        let questions = [];
+        let currentIndex = 0;
+
+        document.getElementById('pdfInput').addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async function() {
+                    const typedArray = new Uint8Array(reader.result);
+                    const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                    let extractedText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(" ");
+                        extractedText += pageText + "\n";
+                    }
+                    extractQuestions(extractedText);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        function extractQuestions(text) {
+            const questionRegex = /([^.?]*\?)/g;
+            const matches = text.match(questionRegex) || [];
+            questions = matches.map(q => ({ text: q.trim(), answer: Math.random() > 0.5 }));
+            currentIndex = 0;
+            displayQuestion();
+        }
+
+        function displayQuestion() {
+            if (questions.length === 0) return;
+            document.getElementById('question-container').style.display = 'block';
+            document.getElementById('question-text').textContent = questions[currentIndex].text;
+            document.getElementById('feedback').textContent = '';
+        }
+
+        function checkAnswer(answer) {
+            document.getElementById('feedback').textContent = answer === questions[currentIndex].answer ? "Correcto" : "Incorrecto";
+        }
+
+        function nextQuestion() {
+            if (currentIndex < questions.length - 1) {
+                currentIndex++;
+                displayQuestion();
+            }
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                displayQuestion();
+            }
+        }
+    </script>
+</body>
+</html>
