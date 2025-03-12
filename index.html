@@ -65,8 +65,7 @@
                         extractedText += pageText + "\n";
 
                         // Extraer imágenes
-                        const pageResources = await page.getOperatorList();
-                        const imagesOnPage = extractImages(pageResources);
+                        const imagesOnPage = await extractImagesFromPage(page);
                         images = images.concat(imagesOnPage);
                     }
 
@@ -78,12 +77,35 @@
             }
         });
 
-        // Función para extraer imágenes
-        function extractImages(pageResources) {
-            // Aquí se puede agregar lógica para extraer imágenes de los recursos de la página
-            // Esta es una función placeholder. Necesitarás más detalles según las imágenes que estés buscando.
-            // Por ahora, solo simula que extrae imágenes vacías.
-            return [];  // Esta función debería devolver las imágenes de la página.
+        // Función para extraer imágenes de la página usando los recursos de XObject
+        async function extractImagesFromPage(page) {
+            const images = [];
+            const pageResources = await page.getOperatorList();
+            const xobjects = pageResources.items.filter(item => item.fn === pdfjsLib.OPS.paintImageXObject);
+
+            // Extraer las imágenes de los XObjects
+            for (let xobject of xobjects) {
+                const imageData = await page.objs.get(xobject.args[0]);
+                const img = await convertImageDataToBase64(imageData);
+                images.push(img);
+            }
+
+            return images;
+        }
+
+        // Función para convertir datos de imagen a base64
+        async function convertImageDataToBase64(imageData) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const img = new Image();
+            img.src = imageData;
+            await new Promise(resolve => {
+                img.onload = () => {
+                    context.drawImage(img, 0, 0);
+                    resolve();
+                };
+            });
+            return canvas.toDataURL('image/png');
         }
 
         function extractQuestions(text, images) {
