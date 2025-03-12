@@ -43,20 +43,25 @@
         document.getElementById('pdfInput').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (file) {
+                console.log("Archivo seleccionado: " + file.name);
                 document.getElementById('loading-container').style.display = 'block';
                 document.getElementById('progress').style.width = '0%';
                 const reader = new FileReader();
                 reader.onload = async function() {
+                    console.log("Leyendo archivo PDF...");
                     const typedArray = new Uint8Array(reader.result);
                     const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                    console.log("PDF cargado con " + pdf.numPages + " páginas.");
                     let extractedText = "";
                     for (let i = 1; i <= pdf.numPages; i++) {
+                        console.log("Procesando página " + i + "...");
                         document.getElementById('progress').style.width = `${(i / pdf.numPages) * 100}%`;
                         const page = await pdf.getPage(i);
                         const textContent = await page.getTextContent();
                         const pageText = textContent.items.map(item => item.str).join(" ");
                         extractedText += pageText + "\n";
                     }
+                    console.log("Extracción de texto completada.");
                     extractQuestions(extractedText);
                     document.getElementById('loading-container').style.display = 'none';
                 };
@@ -65,22 +70,27 @@
         });
 
         function extractQuestions(text) {
+            console.log("Extrayendo preguntas del texto...");
             const questionRegex = /([^.?]*\?)/g;
             const matches = text.match(questionRegex) || [];
             questions = matches.map(q => ({ text: q.trim(), answer: Math.random() > 0.5 }));
+            console.log("Se encontraron " + questions.length + " preguntas.");
             currentIndex = 0;
             displayQuestion();
         }
 
         function displayQuestion() {
             if (questions.length === 0) return;
+            console.log("Mostrando pregunta " + (currentIndex + 1) + " de " + questions.length);
             document.getElementById('question-container').style.display = 'block';
             document.getElementById('question-text').textContent = questions[currentIndex].text;
             document.getElementById('feedback').textContent = '';
         }
 
         function checkAnswer(answer) {
-            document.getElementById('feedback').textContent = answer === questions[currentIndex].answer ? "Correcto" : "Incorrecto";
+            const correct = answer === questions[currentIndex].answer;
+            document.getElementById('feedback').textContent = correct ? "Correcto" : "Incorrecto";
+            console.log("Respuesta seleccionada: " + (answer ? "Verdadero" : "Falso") + ". Resultado: " + (correct ? "Correcto" : "Incorrecto"));
         }
 
         function nextQuestion() {
