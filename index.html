@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
-    <h1>Sube un PDF con preguntas</h1>
+    <h1>Sube un PDF con preguntrras</h1>
     <input type="file" id="pdfInput" accept="application/pdf">
     
     <div id="loading-container">
@@ -71,8 +71,9 @@
 
         function extractQuestions(text) {
             console.log("Extrayendo preguntas del texto...");
-            const questionRegex = /([^.?]*\?)/g;
+            const questionRegex = /([^.?!]*\?)/g;
             const matches = text.match(questionRegex) || [];
+            console.log(matches);  // Verifica las preguntas extraídas
             questions = matches.map(q => ({ text: q.trim(), answer: Math.random() > 0.5 }));
             console.log("Se encontraron " + questions.length + " preguntas.");
             currentIndex = 0;
