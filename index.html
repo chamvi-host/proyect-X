@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body>
-    <h1>Sube un PDF con preguntrras</h1>
+    <h1>Sube un PDF con preguntas</h1>
     <input type="file" id="pdfInput" accept="application/pdf">
     
     <div id="loading-container">
@@ -53,6 +53,9 @@
                     const pdf = await pdfjsLib.getDocument(typedArray).promise;
                     console.log("PDF cargado con " + pdf.numPages + " páginas.");
                     let extractedText = "";
+                    let images = [];
+
+                    // Procesamos cada página para extraer texto e imágenes
                     for (let i = 1; i <= pdf.numPages; i++) {
                         console.log("Procesando página " + i + "...");
                         document.getElementById('progress').style.width = `${(i / pdf.numPages) * 100}%`;
@@ -60,21 +63,39 @@
                         const textContent = await page.getTextContent();
                         const pageText = textContent.items.map(item => item.str).join(" ");
                         extractedText += pageText + "\n";
+
+                        // Extraer imágenes
+                        const pageResources = await page.getOperatorList();
+                        const imagesOnPage = extractImages(pageResources);
+                        images = images.concat(imagesOnPage);
                     }
+
                     console.log("Extracción de texto completada.");
-                    extractQuestions(extractedText);
+                    extractQuestions(extractedText, images);
                     document.getElementById('loading-container').style.display = 'none';
                 };
                 reader.readAsArrayBuffer(file);
             }
         });
 
-        function extractQuestions(text) {
+        // Función para extraer imágenes
+        function extractImages(pageResources) {
+            // Aquí se puede agregar lógica para extraer imágenes de los recursos de la página
+            // Esta es una función placeholder. Necesitarás más detalles según las imágenes que estés buscando.
+            // Por ahora, solo simula que extrae imágenes vacías.
+            return [];  // Esta función debería devolver las imágenes de la página.
+        }
+
+        function extractQuestions(text, images) {
             console.log("Extrayendo preguntas del texto...");
             const questionRegex = /([^.?!]*\?)/g;
             const matches = text.match(questionRegex) || [];
             console.log(matches);  // Verifica las preguntas extraídas
-            questions = matches.map(q => ({ text: q.trim(), answer: Math.random() > 0.5 }));
+            questions = matches.map((q, index) => ({
+                text: q.trim(),
+                image: images[index] || null,  // Asociamos una imagen si existe
+                answer: Math.random() > 0.5
+            }));
             console.log("Se encontraron " + questions.length + " preguntas.");
             currentIndex = 0;
             displayQuestion();
@@ -85,6 +106,13 @@
             console.log("Mostrando pregunta " + (currentIndex + 1) + " de " + questions.length);
             document.getElementById('question-container').style.display = 'block';
             document.getElementById('question-text').textContent = questions[currentIndex].text;
+            const imgElement = document.getElementById('question-image');
+            if (questions[currentIndex].image) {
+                imgElement.src = questions[currentIndex].image;  // Asignar la imagen a mostrar
+                imgElement.style.display = 'block';
+            } else {
+                imgElement.style.display = 'none';
+            }
             document.getElementById('feedback').textContent = '';
         }
 
